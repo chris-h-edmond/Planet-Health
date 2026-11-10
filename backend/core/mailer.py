@@ -54,3 +54,24 @@ def send_email(
     except Exception as exc:  # pragma: no cover - depends on live SMTP server
         logger.error("Failed to deliver email to %s: %s", to_email, exc)
         raise
+
+
+def send_password_reset_email(
+    settings: Settings,
+    *,
+    to_email: str,
+    full_name: str,
+    reset_url: str,
+) -> None:
+    """Deliver a password reset link."""
+    subject = "Reset your Planet Health password"
+    body = (
+        f"Hello {full_name},\n\n"
+        "Someone requested a password reset for your Planet Health account.\n\n"
+        f"Open the link below to choose a new password:\n\n{reset_url}\n\n"
+        "The link is valid for 60 minutes and can only be used once.\n"
+        "If you did not request this, you can safely ignore this email — "
+        "your password has not changed.\n\n"
+        "— Planet Health\n"
+    )
+    send_email(settings, to_email=to_email, subject=subject, body=body)

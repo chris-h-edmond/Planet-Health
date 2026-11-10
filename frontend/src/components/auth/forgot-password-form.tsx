@@ -77,7 +77,8 @@ export function ForgotPasswordForm() {
           <AlertTitle>Check your inbox</AlertTitle>
           <AlertDescription>
             If an account exists for that address, a password reset email has
-            been sent.
+            been sent. The link is valid for 60 minutes and can only be used
+            once.
           </AlertDescription>
         </Alert>
       ) : (

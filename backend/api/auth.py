@@ -25,8 +25,13 @@ from core.errors import (
     AuthenticationError,
     ServiceUnavailableError,
 )
-from core.mailer import EmailDeliveryNotConfigured, is_available, send_email
+from core.mailer import (
+    EmailDeliveryNotConfigured,
+    is_available,
+    send_password_reset_email,
+)
 from core.rate_limit import rate_limiter
+from core.security import generate_token, hash_token
 from db.models import User
 from schemas.auth import (
     AuthResponse,
@@ -34,10 +39,11 @@ from schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     UpdateProfileRequest,
     UserResponse,
 )
-from services import auth_service
+from services import auth_service, reset_service
 
 logger = logging.getLogger("planethealth.auth")
 
@@ -165,8 +171,6 @@ def me(
         expires_at = auth_service.refresh_session(db, context.record, settings)
         # The raw CSRF token is not recoverable from the database, so a fresh
         # pair is issued together with the refreshed session.
-        from core.security import generate_token, hash_token
-
         csrf_token = generate_token(32)
         context.record.csrf_token_hash = hash_token(csrf_token)
         db.commit()
@@ -191,8 +195,6 @@ def refresh(
     _: None = Depends(enforce_csrf),
 ) -> AuthResponse:
     expires_at = auth_service.refresh_session(db, context.record, settings)
-
-    from core.security import generate_token, hash_token
 
     csrf_token = generate_token(32)
     context.record.csrf_token_hash = hash_token(csrf_token)
@@ -257,7 +259,8 @@ def forgot_password(
 
     Password reset requires a real SMTP transport.  When none is configured the
     endpoint reports the feature as unavailable instead of pretending that an
-    email was sent.
+    email was sent.  When a transport *is* configured, an email containing a
+    single-use link is really delivered.
     """
     if not is_available(settings):
         raise ServiceUnavailableError(
@@ -268,15 +271,52 @@ def forgot_password(
 
     user = auth_service.get_user_by_email(db, payload.email)
     if user is not None:
-        # The reset token lifecycle is intentionally conservative: a reset
-        # link is only issued when the transport is actually available.
-        from core.security import generate_token, hash_token
+        raw_token, _record = reset_service.create_reset_token(db, user=user)
+        reset_url = (
+            f"{settings.public_app_url.rstrip('/')}/reset-password"
+            f"?token={raw_token}"
+        )
+        try:
+            send_password_reset_email(
+                settings,
+                to_email=user.email,
+                full_name=user.full_name,
+                reset_url=reset_url,
+            )
+        except Exception:
+            logger.exception("Password reset email could not be delivered")
+            raise ServiceUnavailableError(
+                "The password reset email could not be delivered. Please try again later.",
+                code="EMAIL_DELIVERY_FAILED",
+            ) from None
+        logger.info("Password reset email sent for user %s", user.id)
 
-        reset_token = generate_token(32)
-        logger.info("Password reset requested for %s (token issued)", user.email)
-        del reset_token, hash_token
-
+    # The response is identical whether or not the address exists, so the
+    # endpoint cannot be used to enumerate accounts.
     return {
         "message": "If an account exists for that address, a password reset email has been sent.",
         "delivery_available": True,
     }
+
+
+@router.post("/reset-password", summary="Set a new password with a reset token")
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_app_settings),
+    _: None = Depends(enforce_trusted_origin),
+) -> dict[str, str]:
+    """Consume a reset token and set a new password."""
+    user = reset_service.consume_reset_token(db, raw_token=payload.token)
+    if user is None:
+        raise AppError(
+            status_code=400,
+            code="INVALID_RESET_TOKEN",
+            message="This password reset link is invalid or has expired. Please request a new one.",
+        )
+
+    auth_service.update_password(db, user=user, new_password=payload.new_password)
+    # Every existing session is invalidated after a password reset.
+    auth_service.revoke_all_sessions(db, user.id)
+
+    return {"message": "Your password has been updated. You can now sign in."}

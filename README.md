@@ -251,6 +251,7 @@ Base URL: `http://localhost:8000` (or `/api` on the frontend origin).
 | `PATCH` | `/api/auth/me` | Update the display name | ✔ |
 | `POST` | `/api/auth/change-password` | Change the password | ✔ |
 | `POST` | `/api/auth/forgot-password` | Request a reset email | — |
+| `POST` | `/api/auth/reset-password` | Set a new password with a reset token | — |
 | `POST` | `/api/analysis/predict` | Upload an image and run both models | ✔ |
 | `GET` | `/api/analysis` | Paginated analysis history | ✔ |
 | `GET` | `/api/analysis/{id}` | A single analysis owned by the caller | ✔ |
@@ -289,10 +290,19 @@ Interactive documentation is served at `/docs` (Swagger UI) and `/redoc`.
 
 ### Forgot password
 
-Password reset requires a real SMTP transport. When `EMAIL_DELIVERY_ENABLED`
-is `false` — the default — the endpoint answers `503` with
-`EMAIL_DELIVERY_NOT_CONFIGURED` and the UI says plainly that the feature is
-unavailable. It never pretends that an email was sent.
+Password reset requires a real SMTP transport.
+
+- With `EMAIL_DELIVERY_ENABLED=false` — the default — the endpoint answers
+  `503` with `EMAIL_DELIVERY_NOT_CONFIGURED` and the UI says plainly that
+  the feature is unavailable. It never pretends that an email was sent.
+- With SMTP configured, a single-use token is created, a reset link is
+  **actually delivered** by SMTP, and `/reset-password` consumes the token
+  and sets the new password. The response is identical for known and unknown
+  addresses, so the endpoint cannot be used to enumerate accounts.
+
+Reset tokens expire after 60 minutes, can only be used once, invalidate the
+previous outstanding links for the account, and are stored only as a SHA-256
+digest. Resetting a password revokes every existing session.
 
 ---
 
@@ -448,6 +458,17 @@ Created by Alembic (`backend/alembic/versions/0001_initial_schema.py`).
 | `user_agent` | `VARCHAR(255)` | |
 | `ip_address` | `VARCHAR(64)` | |
 
+### `password_reset_tokens`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `UUID` | Primary key |
+| `user_id` | `INTEGER` | FK → `users.id`, `ON DELETE CASCADE` |
+| `token_hash` | `VARCHAR(64)` | SHA-256 of the reset token, unique |
+| `expires_at` | `TIMESTAMPTZ` | Indexed — 60 minute lifetime |
+| `used_at` | `TIMESTAMPTZ` | Set when the token is consumed |
+| `created_at` | `TIMESTAMPTZ` | |
+
 ### `analyses`
 
 | Column | Type | Notes |
@@ -566,7 +587,7 @@ Planet-Health/
 ## Testing
 
 ```bash
-# Backend — 23 tests, no models required
+# Backend — 36 tests, no models required
 cd backend && python -m pytest -q
 
 # Frontend — type safety and production build
@@ -577,7 +598,8 @@ The backend suite covers registration and validation, Argon2id hashing,
 login and logout, HTTP-only cookie flags, CSRF enforcement, protected routes,
 cross-account isolation of analyses, dashboard statistics derived from real
 records, image validation (wrong type, mislabelled payload), the model
-status endpoint and the `503` behaviour when the models are absent.
+status endpoint, the `503` behaviour when the models are absent, and the
+complete password reset flow including single-use tokens.
 
 ---
 

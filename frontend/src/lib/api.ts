@@ -243,6 +243,17 @@ export const authApi = {
         body: JSON.stringify({ email }),
       },
     ),
+
+  resetPassword: (input: {
+    token: string;
+    new_password: string;
+    confirm_new_password: string;
+  }) =>
+    request<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
 };
 
 /* -------------------------------------------------------------------------- */

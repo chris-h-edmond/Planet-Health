@@ -111,6 +111,23 @@ class ForgotPasswordRequest(BaseModel):
         return value.strip().lower()
 
 
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10, max_length=256)
+    new_password: str = Field(..., min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
+    confirm_new_password: str = Field(..., min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
+
+    @field_validator("new_password")
+    @classmethod
+    def _check_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
+
+    @model_validator(mode="after")
+    def _passwords_match(self) -> "ResetPasswordRequest":
+        if self.new_password != self.confirm_new_password:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
