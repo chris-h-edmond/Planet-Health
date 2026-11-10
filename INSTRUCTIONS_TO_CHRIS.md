@@ -1,148 +1,81 @@
-# Planet Health — Instructions for Chris
+# Planet Health — Phase 2 Completion Record & Operating Guide
 
-This document describes, step by step, how to move the **existing trained
-models** into the Planet Health application.
+This document records the completed integration of the trained models and
+explains how to operate, verify and troubleshoot them.
 
-> **Current state:** the repository contains the complete application, but it
-> **does not contain any model files**. `backend/inference.py` has not been
-> transferred yet, and neither `growth_model.pth` nor `stress_model.pth` is
-> present. The application starts, serves every endpoint and answers
-> `503` on the prediction endpoint until the three files below are in place.
->
-> **Nothing in this document has been done yet.** Every step is written as
-> something *you* do.
+> **Phase 2 status: complete.** Both checkpoints and the working
+> `backend/inference.py` are tracked in this repository, the models load once
+> during the FastAPI startup, and the dashboard returns real predictions.
+> Neither model was retrained, recreated or modified.
 
 ---
 
-## 1. The two-phase workflow
+## 1. What was transferred
 
-| Phase | Scope | Status |
-|---|---|---|
-| **Phase 1** | Full application: frontend, backend, auth, database, dashboard, upload UI, history, settings, Docker Compose, docs. Runs without the models. | ✅ Complete |
-| **Phase 2** | Transfer the three ML files, verify checkpoint paths, confirm CPU inference, wire real predictions into the UI. | ⏳ Waiting on you |
+| File | Original location | Size | State |
+|---|---|---|---|
+| `backend/inference.py` | `<research>/backend/inference.py` | 9 KB | **Unmodified** |
+| `backend/models/growth/growth_model.pth` | `<research>/artifacts/growth/growth_model.pth` | 42.7 MB | Unmodified |
+| `backend/models/stress/stress_model.pth` | `<research>/artifacts/stress/stress_model.pth` | 42.7 MB | Unmodified |
 
-**Phase 1 must be finished and verified before Phase 2 begins.** The
-application is deliberately built so that Phase 2 is a *file copy* plus a
-verification pass — no restructuring, no rewrites, no new model code.
+The research evaluation artefacts that accompanied the checkpoints were
+included as well, because they document how the models were validated:
+
+| File | Contents |
+|---|---|
+| `backend/models/growth/cv_metrics.json` | LeaveOnePlantOut cross-validation, per fold and overall |
+| `backend/models/growth/cv_predictions.csv` | Per-image cross-validation predictions |
+| `backend/models/growth/cv_plant_day_predictions.csv` | Per-plant/per-day cross-validation predictions |
+| `backend/models/stress/metrics.json` | Split sizes and best validation accuracy |
+| `backend/models/stress/training_history.csv` | Per-epoch loss and accuracy |
 
 ---
 
-## 2. What already exists in the original research project
+## 2. Git tracking — plain Git, no LFS
 
-The original research project already contains a working, smoke-tested
-inference implementation. **Do not rebuild it.**
+Git LFS is **not** used for this repository. The checkpoints are ordinary Git
+blobs.
 
-```text
-<original research project>/
-├── artifacts/
-│   ├── stress/
-│   │   └── stress_model.pth      <-- trained checkpoint
-│   └── growth/
-│       └── growth_model.pth      <-- trained checkpoint
-└── backend/
-    └── inference.py               <-- working inference helper
+- `.gitignore` no longer contains any `*.pth` / `backend/models/**` rule. It
+  still excludes `.env`, `__pycache__/`, `.venv/` and the other build and
+  runtime artefacts.
+- `.gitattributes` marks `*.pth` as `binary` so Git never applies text
+  normalisation to it. The pre-existing `* text=auto` default is untouched.
+
+Confirm the state:
+
+```bash
+git check-attr -a backend/models/growth/growth_model.pth
+#  -> binary: set
+#  -> diff: unset
+#  -> merge: unset
+#  -> text: unset      (no filter=lfs -> not an LFS pointer)
+
+git ls-tree -r -l HEAD -- backend/models
+#  -> blob 06e9cb1f…  44788043  backend/models/growth/growth_model.pth
+#  -> blob bf46db45…  44790283  backend/models/stress/stress_model.pth
 ```
 
-`backend/inference.py` imports only `torch`, `torchvision` and `Pillow`. It
-does **not** depend on a local model class, `timm` or `utils.py`. It exposes:
+Both blobs are the real 44.8 MB checkpoints, not LFS pointers.
+
+**Consequence:** a plain `git clone` contains everything needed to run
+inference, and the repository is ~85 MB larger than the source tree.
+
+---
+
+## 3. How the checkpoint paths are configured
+
+`backend/inference.py` was **not** edited. Its own defaults still point at
+the research layout:
 
 ```python
-load_models(growth_checkpoint=..., stress_checkpoint=..., device=None) -> PlantModels
-predict_image(image, models_bundle) -> dict
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_GROWTH_CHECKPOINT = PROJECT_ROOT / "artifacts" / "growth" / "growth_model.pth"
 ```
 
-It already handles EXIF orientation, RGB conversion, resizing to 224 × 224,
-ImageNet normalisation taken from the checkpoints, CPU/CUDA selection and
-returns JSON-serialisable predictions.
-
----
-
-## 3. The three files you must transfer
-
-| # | Original location | Destination in this repository |
-|---|---|---|
-| 1 | `<research>/backend/inference.py` | `backend/inference.py` |
-| 2 | `<research>/artifacts/growth/growth_model.pth` | `backend/models/growth/growth_model.pth` |
-| 3 | `<research>/artifacts/stress/stress_model.pth` | `backend/models/stress/stress_model.pth` |
-
-Copy them with plain file operations — do not edit their contents:
-
-```bash
-# from the repository root
-cp <research>/backend/inference.py            backend/inference.py
-cp <research>/artifacts/growth/growth_model.pth backend/models/growth/growth_model.pth
-cp <research>/artifacts/stress/stress_model.pth backend/models/stress/stress_model.pth
-```
-
-**Never create dummy or placeholder `.pth` files.** The backend checks that
-each checkpoint exists *and* is a real file before it reports the models as
-ready.
-
----
-
-## 4. Git LFS or external artifact storage — decide before you copy
-
-The original research project's `.gitignore` ignores the whole `artifacts/`
-directory, so the checkpoints are **not** part of a normal Git clone. This
-repository's `.gitattributes` already contains Git LFS rules for `*.pth`
-(`filter=lfs diff=lfs merge=lfs -text`), and `.gitignore` excludes the
-checkpoint binaries from plain Git objects.
-
-Two supported options:
-
-### Option A — Git LFS (recommended for this repository)
-
-Git LFS 3.5.1 is already installed on this machine.
-
-```bash
-cd <planet-health-repo>
-git lfs install
-git lfs track "backend/models/**/*.pth"
-git add .gitattributes
-git commit -m "chore: track model checkpoints with Git LFS"
-```
-
-Then copy the checkpoints in and verify LFS picked them up:
-
-```bash
-cp <research>/artifacts/growth/growth_model.pth backend/models/growth/
-cp <research>/artifacts/stress/stress_model.pth backend/models/stress/
-
-git add backend/models
-git lfs ls-files          # both .pth files must be listed
-git commit -m "feat: add trained model checkpoints"
-```
-
-Cloning a fresh copy then requires `git lfs install` once before
-`git lfs pull`.
-
-### Option B — External artifact storage
-
-If you would rather not put the binaries in Git at all:
-
-1. Upload `growth_model.pth` and `stress_model.pth` to your artifact store
-   (S3, GCS, Azure Blob, Hugging Face, an internal mirror …).
-2. **Remove** the `*.pth filter=lfs …` lines from `.gitattributes` so the
-   repository does not advertise LFS tracking it does not use.
-3. Keep the `.gitignore` entries for `*.pth` so a local copy is never
-   committed by accident.
-4. Make the checkpoints available to the container at
-   `backend/models/growth/growth_model.pth` and
-   `backend/models/stress/stress_model.pth` before starting the backend
-   (a download step in your deployment pipeline, or the bind mount already
-   configured in `docker-compose.yml`).
-
-Whichever option you choose, document the decision in this file and update
-the *Model artifact delivery* row of the deployment checklist in
-`README.md`.
-
----
-
-## 5. Checkpoint paths are configurable — no need to edit `inference.py`
-
-`backend/services/model_service.py` calls the transferred helper with
-explicit paths, so the default checkpoint paths inside `inference.py` (which
-point at the old `artifacts/…` layout) are **never used**:
+Inside this repository that resolves to `/artifacts/…`, which does not exist.
+It is never used, because `backend/services/model_service.py` calls the helper
+with explicit keyword arguments:
 
 ```python
 load_models(
@@ -151,331 +84,234 @@ load_models(
 )
 ```
 
-The paths come from environment variables and default to the correct
-locations inside this repository:
+The service inspects the signature of `load_models` and only passes the
+arguments it accepts, so the transferred implementation keeps working
+unchanged.
 
-| Variable | Default |
+The paths themselves come from the environment:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MODEL_GROWTH_CHECKPOINT` | `models/growth/growth_model.pth` | Relative paths resolve against the backend package root, never against the working directory. |
+| `MODEL_STRESS_CHECKPOINT` | `models/stress/stress_model.pth` | Same. |
+
+---
+
+## 4. Dependency verification
+
+The runtime needs `torch`, `torchvision` and `Pillow` — exactly what
+`inference.py` imports. It does not depend on `timm`, a local model class or
+`utils.py`.
+
+```bash
+cd backend
+pip install -r requirements-ml.txt          # points at the PyTorch CPU index
+```
+
+Verified inside the container:
+
+```text
+torch 2.9.1+cpu | torchvision 0.24.1+cpu
+```
+
+The backend image installs the runtime when `INSTALL_ML_DEPS=true` (the
+default). With `INSTALL_ML_DEPS=false` the application still starts, but the
+models cannot be imported and the service reports `not_configured`.
+
+---
+
+## 5. Model lifecycle
+
+| Stage | Behaviour |
 |---|---|
-| `MODEL_GROWTH_CHECKPOINT` | `models/growth/growth_model.pth` (relative to `backend/`) |
-| `MODEL_STRESS_CHECKPOINT` | `models/stress/stress_model.pth` (relative to `backend/`) |
+| Startup | `load_models()` is called **once**, inside the FastAPI lifespan. |
+| State | The returned `PlantModels` bundle is stored on the `ModelService` singleton, i.e. in application state. |
+| Request | `predict_image(image_bytes, models_bundle)` runs the two checkpoints. |
+| Threading | Route handlers are synchronous, so FastAPI runs them in its worker threadpool. Inside the service a dedicated `ThreadPoolExecutor` with `INFERENCE_MAX_CONCURRENCY` workers performs the PyTorch call, and a bounded semaphore refuses extra concurrent jobs with `MODEL_BUSY`. The event loop is never blocked. |
+| Missing checkpoint | `not_configured` / `MODEL_NOT_CONFIGURED`; the prediction endpoint answers `503`. |
+| Load failure | `failed` / `MODEL_LOAD_FAILED`; every unrelated endpoint keeps working. |
+| Inference failure | `INFERENCE_FAILED` (500), `INFERENCE_TIMEOUT` (504) — always distinct from a *missing* model. |
 
-If you prefer absolute paths, set them in `backend/.env` or in the root
-`.env` used by Docker Compose.
+### Verification performed
 
-**Important:** `backend/inference.py` must not be modified. If it *is*
-modified, keep the `load_models(...)` and `predict_image(...)` signatures
-and the returned dictionary exactly as they are — the backend, the database
-schema and the frontend all depend on that contract.
+```text
+one container restart   ->  1 x "Loading models (growth=…, stress=…, device=auto)"
+20 consecutive predictions ->  0 additional loads
+```
+
+The bundle is therefore reused for every request and never reloaded.
 
 ---
 
-## 6. Install the runtime dependencies
+## 6. Verification record
 
-The PyTorch runtime is deliberately kept out of the core requirements file so
-that the application can run without it.
+### 6.1 Model loading
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip install -r requirements-ml.txt
+```text
+INFO  planethealth.models :: Model status changed to loading (Loading model checkpoints.)
+INFO  planethealth.models :: Loading models (growth=/app/models/growth/growth_model.pth,
+                               stress=/app/models/stress/stress_model.pth, device=auto)
+INFO  planethealth.models :: Model status changed to ready (Plant analysis models are ready.)
+INFO  planethealth :: Model service status: ready
 ```
 
-`requirements-ml.txt` already points at the PyTorch **CPU** wheel index, so
-the multi-gigabyte CUDA builds are not pulled in. For a GPU, swap the index
-for `https://download.pytorch.org/whl/cu121`:
+`load_models()` returns a `PlantModels` bundle with `device=cpu` and the
+preprocessing `Compose(Resize((224, 224)), ToTensor(), Normalize(ImageNet))`
+read from the checkpoints.
 
-```bash
-pip install torch==2.9.1 torchvision==0.24.1 \
-    --index-url https://download.pytorch.org/whl/cu121
+### 6.2 `GET /api/models/status`
+
+```json
+{
+  "status": "ready",
+  "code": "MODEL_READY",
+  "available": true,
+  "availability": "available",
+  "message": "Plant analysis models are ready.",
+  "models": { "stress": true, "growth": true },
+  "device": "cpu"
+}
 ```
 
-Keep the `torch` / `torchvision` pair in sync — `torchvision 0.24.x` targets
-`torch 2.9.x`.
+### 6.3 Real CPU inference — GroMo25 photographs
 
-With Docker the runtime is installed automatically unless you set
-`INSTALL_ML_DEPS=false`:
+Images taken from the `MrigLabIITRopar/GroMo25` dataset the models were
+trained on (12 MP phone photographs).
 
-```bash
-# in the repository root .env
-INSTALL_ML_DEPS=true
-```
-
----
-
-## 7. Verify the model loading (step by step)
-
-### 7.1 Import check — does `inference.py` load?
-
-```bash
-cd backend
-python -c "import inference; print(inference.load_models); print(inference.predict_image)"
-```
-
-Expected: two function objects, no exception.
-
-### 7.2 Checkpoint paths
-
-```bash
-ls -lh backend/models/growth/growth_model.pth backend/models/stress/stress_model.pth
-```
-
-Both files must exist and be non-empty (a ResNet-18 checkpoint is roughly
-45 MB).
-
-### 7.3 Load the models directly
-
-```bash
-cd backend
-python - <<'PY'
-from inference import load_models
-
-bundle = load_models(
-    growth_checkpoint="models/growth/growth_model.pth",
-    stress_checkpoint="models/stress/stress_model.pth",
-)
-print("models loaded:", type(bundle).__name__)
-print("device:", getattr(bundle, "device", "unknown"))
-PY
-```
-
-Expected: the bundle is printed with no traceback, on CPU by default.
-
-### 7.4 CPU inference on a real image
-
-```bash
-cd backend
-python - <<'PY'
-import json
-from inference import load_models, predict_image
-
-bundle = load_models(
-    growth_checkpoint="models/growth/growth_model.pth",
-    stress_checkpoint="models/stress/stress_model.pth",
-)
-result = predict_image("path/to/a/real/leaf.jpg", bundle)
-print(json.dumps(result, indent=2))
-PY
-```
-
-Use a genuine plant photograph (the research project used a GroMo25 sample).
-This is the same call the API makes.
-
----
-
-## 8. Verify the exact API response
-
-Start the backend:
-
-```bash
-cd backend
-alembic upgrade head
-uvicorn main:app --reload --port 8000
-```
-
-In a second terminal, register a user and run a prediction:
-
-```bash
-# 1. register
-curl -s -c cookies.txt -X POST http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"full_name":"Chris","email":"chris@example.com","password":"Greenhouse1","confirm_password":"Greenhouse1"}'
-
-# 2. read the CSRF token out of the cookie jar
-CSRF=$(grep ph_csrf cookies.txt | awk '{print $7}')
-
-# 3. upload an image
-curl -s -b cookies.txt -X POST http://localhost:8000/api/analysis/predict \
-  -H "X-CSRF-Token: $CSRF" \
-  -F "file=@path/to/leaf.jpg" \
-  -D headers.txt
-```
-
-The response body must be **exactly** this shape:
+**`radish/p1/d1/L1` — ground truth: 2 leaves, day 1**
 
 ```json
 {
   "stress": {
     "label": "Stressed",
-    "stress_score": 0.87,
+    "stress_score": 0.9962108135223389,
     "score_scale": "0-1",
-    "probabilities": {
-      "healthy": 0.13,
-      "stressed": 0.87
-    }
+    "probabilities": { "healthy": 0.003789192298427224, "stressed": 0.9962108135223389 }
   },
-  "growth": {
-    "leaf_count": 8.4,
-    "leaf_count_rounded": 8,
-    "age_days": 26.2
-  }
+  "growth": { "leaf_count": 1.0987526178359985, "leaf_count_rounded": 1, "age_days": 0.0 }
 }
 ```
 
-(The numbers above are illustrative — yours will differ.)
+**`radish/p1/d25/L1` — ground truth: 10 leaves, day 25**
 
-The response also carries two headers:
-
-| Header | Purpose |
-|---|---|
-| `X-Analysis-Id` | The UUID of the stored analysis. The frontend uses it to open the results page. |
-| `Location` | `/api/analysis/<id>` |
-
-The body is intentionally **unchanged** from `predict_image()` so that the
-contract with the original research project is preserved. Do not add fields
-to it without versioning the API.
-
----
-
-## 9. Switch the backend from *model-unavailable* to *model-ready*
-
-There is no flag to flip. The backend decides automatically:
-
-1. **Model status endpoint** — check what the backend thinks:
-
-   ```bash
-   curl -s http://localhost:8000/api/models/status
-   ```
-
-   | Response | Meaning |
-   |---|---|
-   | `{"status": "not_configured", "code": "MODEL_NOT_CONFIGURED", "available": false}` | `inference.py` or a checkpoint is missing. |
-   | `{"status": "loading", "code": "MODEL_LOADING", "available": false}` | The checkpoints are still being read. |
-   | `{"status": "failed", "code": "MODEL_LOAD_FAILED", "available": false}` | The checkpoints were found but could not be loaded — read the backend log. |
-   | `{"status": "ready", "code": "MODEL_READY", "available": true}` | Inference is available. |
-
-2. **Restart the backend** after copying the files in. The models are loaded
-   **once**, during the FastAPI lifespan — they are never reloaded per
-   request, and a copy performed while the server is running is not picked up
-   until it restarts.
-
-3. **Docker:** the `backend/models` directory is bind-mounted read-only into
-   the container, so a plain file copy is enough:
-
-   ```bash
-   cp <research>/artifacts/growth/growth_model.pth backend/models/growth/
-   cp <research>/artifacts/stress/stress_model.pth backend/models/stress/
-   docker compose restart backend
-   curl -s http://localhost:8000/api/models/status
-   ```
-
-4. **Expected behaviour before the copy** — the prediction endpoint must
-   answer:
-
-   ```http
-   HTTP/1.1 503 Service Unavailable
-
-   {
-     "error": {
-       "code": "MODEL_NOT_CONFIGURED",
-       "message": "Plant analysis models are not configured."
-     }
-   }
-   ```
-
-   If it answers with anything else, something is wrong — investigate before
-   continuing.
-
----
-
-## 10. Frontend verification checklist
-
-With the backend running and the models loaded:
-
-- [ ] Open the dashboard — the upload card shows **no** "model integration is
-      pending" banner.
-- [ ] Upload a real leaf photograph. The card shows *Analyzing plant image…*
-      while the request is in flight and the button is disabled.
-- [ ] The browser is redirected to `/dashboard/analysis/<uuid>`.
-- [ ] The results page shows the classification, the healthy / stressed
-      probabilities, the **model stress probability**, the estimated leaf
-      count and the estimated age in days.
-- [ ] The dashboard summary cards increment (total, healthy, stressed, recent).
-- [ ] The new row appears in `/dashboard/history`.
-- [ ] Reloading the results page shows the same values (they are read from
-      PostgreSQL, not from client state).
-- [ ] Uploading a second account's analysis id returns `404` — records are
-      scoped to their owner.
-- [ ] The stored row contains prediction values and a timestamp only — no
-      image binary.
-
----
-
-## 11. Deployment readiness checklist
-
-The production target is still undecided. Confirm these before deploying:
-
-- [ ] **Frontend hosting** — a Node.js runtime capable of `next start`
-      (Vercel, a container platform, or a VM).
-- [ ] **Backend hosting** — Python 3.11+ with enough RAM for two ResNet-18
-      models. Measure the real footprint with `docker stats` before choosing
-      a machine size.
-- [ ] **PostgreSQL hosting** — managed (Neon, RDS, Cloud SQL) or a container.
-- [ ] **Reverse proxy** — expose `/api/*` under the frontend origin so the
-      session cookie stays same-site. The Next.js route handler at
-      `src/app/api/[...path]/route.ts` already does this; a production
-      reverse proxy can point `/api/` straight at the backend instead.
-- [ ] **Model artifact delivery** — Git LFS pull or an artifact download step
-      in the deployment pipeline (see section 4).
-- [ ] **CPU / RAM** — confirm actual latency and memory on the target
-      machine. `INFERENCE_MAX_CONCURRENCY=1` is the safe default; raise it
-      only after measuring.
-- [ ] **Environment variables and secrets** — `SECRET_KEY` must be unique and
-      random; `COOKIE_SECURE=true` once HTTPS is in place; `APP_ENV=production`
-      makes the backend refuse the default secret.
-- [ ] **Storage requirements** — none for images. PostgreSQL stores only
-      users, sessions and prediction values.
-- [ ] **TLS and a reverse-proxy trust header** — the backend honours
-      `X-Forwarded-For` for rate limiting.
-
----
-
-## 12. Useful commands
-
-```bash
-# Run the backend test-suite (does not need the models)
-cd backend && python -m pytest -q
-
-# Backend logs with model loading
-cd backend && uvicorn main:app --reload --port 8000
-
-# Full local stack
-docker compose up --build
-
-# Tear the stack down (keeps the database volume)
-docker compose down
-
-# Tear the stack down and delete the database volume
-docker compose down -v
-
-# Check the frontend build
-cd frontend && npm ci && npm run typecheck && npm run build
+```json
+{
+  "stress": {
+    "label": "Stressed",
+    "stress_score": 0.9990670084953308,
+    "score_scale": "0-1",
+    "probabilities": { "healthy": 0.0009330280008725822, "stressed": 0.9990670084953308 }
+  },
+  "growth": { "leaf_count": 10.006080627441406, "leaf_count_rounded": 10, "age_days": 16.308734893798828 }
+}
 ```
 
+The response body is **exactly** the documented contract — the keys are
+`stress.label`, `stress.stress_score`, `stress.score_scale`,
+`stress.probabilities.healthy`, `stress.probabilities.stressed`,
+`growth.leaf_count`, `growth.leaf_count_rounded` and `growth.age_days`, and
+nothing else.
+
+The leaf count is exact (10 predicted → 10 actual). The age estimate of
+16.3 days against an actual 25 days sits inside the documented error band
+(LeaveOnePlantOut image-level Age MAE 15.63 days).
+
+The `Stressed` label is the model's genuine output for these photographs. It
+has not been filtered, tuned or overridden.
+
+### 6.4 Storage and retention
+
+```text
+SELECT column_name, data_type FROM information_schema.columns
+ WHERE table_name = 'analyses';
+ id | uuid                      created_at  | timestamp with time zone
+ user_id | integer              stress_label | character varying
+ stress_score | double precision  score_scale | character varying
+ healthy_probability | double precision
+ stressed_probability | double precision
+ leaf_count | double precision   leaf_count_rounded | integer
+ age_days | double precision
+```
+
+There is **no image column**, no `bytea` and no binary column anywhere in the
+schema. A filesystem sweep of the running container found no uploaded image
+file, and the database is 7.9 MB in total.
+
+Uploaded images are read into memory, validated, processed and discarded.
+
+### 6.5 Missing checkpoints
+
+Moving both checkpoints aside and restarting the backend:
+
+```text
+GET /api/models/status
+{ "status": "not_configured", "code": "MODEL_NOT_CONFIGURED", "available": false,
+  "detail": "Missing checkpoint file(s): /app/models/growth/growth_model.pth,
+             /app/models/stress/stress_model.pth" }
+
+POST /api/analysis/predict  ->  HTTP 503
+{ "error": { "code": "MODEL_NOT_CONFIGURED",
+             "message": "Plant analysis models are not configured." } }
+```
+
+Restoring the checkpoints and restarting returns `ready` again.
+
 ---
 
-## 13. If something goes wrong
+## 7. Operating the models
+
+### Replace a checkpoint
+
+`backend/models/` is bind-mounted read-only into the container, so a plain
+file copy is enough:
+
+```bash
+cp new_model.pth backend/models/growth/growth_model.pth
+docker compose restart backend
+curl -s http://localhost:8000/api/models/status
+```
+
+The models are loaded during startup, so a copy performed while the server is
+running is only picked up after a restart.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MODEL_GROWTH_CHECKPOINT` | `models/growth/growth_model.pth` | Growth checkpoint |
+| `MODEL_STRESS_CHECKPOINT` | `models/stress/stress_model.pth` | Stress checkpoint |
+| `MODEL_LOAD_ON_STARTUP` | `true` | Load the models during the FastAPI lifespan |
+| `MODEL_DEVICE` | `auto` | `auto`, `cpu` or `cuda` |
+| `INFERENCE_MAX_CONCURRENCY` | `1` | Simultaneous inference jobs |
+| `INFERENCE_TIMEOUT_SECONDS` | `120` | Wall-clock limit for one prediction |
+| `INSTALL_ML_DEPS` | `true` | Install torch/torchvision in the image |
+
+---
+
+## 8. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `MODEL_NOT_CONFIGURED` after copying the files | The backend was not restarted | `docker compose restart backend` |
-| `MODEL_NOT_CONFIGURED` and the paths look wrong | Relative paths resolve against the process working directory | Set absolute `MODEL_GROWTH_CHECKPOINT` / `MODEL_STRESS_CHECKPOINT` |
-| `MODEL_LOAD_FAILED` | The checkpoint does not match the architecture in `inference.py`, or torch/torchvision are missing | Read the backend log; check the torch/torchvision version pair |
-| `ModuleNotFoundError: No module named 'torch'` | The ML runtime was not installed | `pip install -r requirements-ml.txt` or set `INSTALL_ML_DEPS=true` and rebuild |
-| `INFERENCE_FAILED` (HTTP 500) | The model raised during inference | Check the backend log; the original error type is recorded in `error.details.reason` |
-| `INFERENCE_TIMEOUT` (HTTP 504) | Inference exceeded `INFERENCE_TIMEOUT_SECONDS` | Raise the timeout or use a smaller image |
-| `MODEL_BUSY` (HTTP 503) | Another inference job is already running | Retry; raise `INFERENCE_MAX_CONCURRENCY` only if RAM allows |
+| `MODEL_NOT_CONFIGURED` | A checkpoint or `inference.py` is missing | Check `detail` in the status response; the path is listed there |
+| `MODEL_LOAD_FAILED` | The checkpoint does not match the architecture, or torch is missing | Read the backend log; check the torch/torchvision version pair |
+| `ModuleNotFoundError: No module named 'torch'` | `INSTALL_ML_DEPS=false` | Rebuild with `INSTALL_ML_DEPS=true` |
+| `MODEL_BUSY` (503) | Another inference job is running | Retry; raise `INFERENCE_MAX_CONCURRENCY` only if RAM allows |
+| `INFERENCE_FAILED` (500) | The model raised during inference | The backend log holds the original exception type in `error.details.reason` |
+| `INFERENCE_TIMEOUT` (504) | Inference exceeded the timeout | Raise `INFERENCE_TIMEOUT_SECONDS` or use a smaller image |
+| `422` on upload | The file is not a decodable JPEG or PNG | Check the format and the 10 MB limit |
+| Slow first prediction | Models load during startup | Expected; the first request after a restart is served by the already-loaded bundle |
 
 ---
 
-## 14. What must **not** change
+## 9. What must not change
 
-These are load-bearing and are covered by the acceptance criteria:
+These remain load-bearing:
 
 1. Do not retrain, fine-tune or re-architect either model.
 2. Do not replace the checkpoint weights.
-3. Do not overwrite `backend/inference.py` with a stub or a re-implementation.
+3. Do not modify `backend/inference.py` — it works as transferred. If it ever
+   must change, keep the `load_models()` and `predict_image()` signatures and
+   the returned dictionary exactly as they are.
 4. Do not fabricate predictions — the API must never return a synthetic
    result when the models are unavailable.
 5. Do not change the successful prediction JSON shape (`stress` / `growth`)

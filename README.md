@@ -15,10 +15,12 @@ The application also keeps a per-user analysis history, exposes dashboard
 statistics derived from real database records, and works in a light and a dark
 theme.
 
-> **Status:** the application is complete and fully functional. The trained
-> model checkpoints are **not** part of this repository. Until they are
-> transferred, the prediction endpoint answers with `HTTP 503` and the UI
-> says so explicitly. See [`INSTRUCTIONS_TO_CHRIS.md`](./INSTRUCTIONS_TO_CHRIS.md).
+> **Status:** the application is complete and the trained models are
+> integrated. Both checkpoints and the working `inference.py` are tracked in
+> this repository, the models load once during the FastAPI startup, and the
+> dashboard returns real predictions. See
+> [`INSTRUCTIONS_TO_CHRIS.md`](./INSTRUCTIONS_TO_CHRIS.md) for the
+> verification record and the operating guide.
 
 ---
 
@@ -33,6 +35,7 @@ theme.
 - [Authentication](#authentication)
 - [Model status and error contract](#model-status-and-error-contract)
 - [Prediction response contract](#prediction-response-contract)
+- [The models](#the-models)
 - [Image handling and storage policy](#image-handling-and-storage-policy)
 - [Database schema](#database-schema)
 - [Design system](#design-system)
@@ -189,16 +192,24 @@ docker compose restart backend      # pick up newly added model checkpoints
 
 ### Model checkpoints and Docker
 
-`backend/models/` is bind-mounted read-only into the backend container, so the
-checkpoints can be added in Phase 2 **without rebuilding the image**. See
-[`INSTRUCTIONS_TO_CHRIS.md`](./INSTRUCTIONS_TO_CHRIS.md).
+`backend/models/` is bind-mounted read-only into the backend container, so a
+checkpoint can be replaced with a plain file copy followed by
+`docker compose restart backend` — no image rebuild required.
 
-The PyTorch runtime is installed in the image by default. For a smaller,
-faster image while the models are not yet installed, set this in `.env`:
+The models are loaded **once**, during the FastAPI startup, and the bundle is
+then reused for every request.
+
+The PyTorch runtime is required — the checkpoints are part of this
+repository, so `INSTALL_ML_DEPS` must stay `true` (the default). Setting it
+to `false` produces a smaller image, but the application will then report
+`not_configured` and the prediction endpoint will answer `503`.
 
 ```bash
-INSTALL_ML_DEPS=false
+INSTALL_ML_DEPS=true
 ```
+
+The checkpoints are tracked in plain Git (no Git LFS), so a clone contains
+everything needed to run inference.
 
 ---
 
@@ -213,9 +224,8 @@ source .venv/bin/activate            # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt      # core API only
 pip install -r requirements-dev.txt  # + pytest, httpx, ruff
-# Optional: the ML runtime (needed in Phase 2)
-pip install torch==2.9.1 torchvision==0.24.1 \
-    --index-url https://download.pytorch.org/whl/cpu
+# The ML runtime (required — the checkpoints live in this repository)
+pip install -r requirements-ml.txt
 
 cp .env.example .env                 # adjust DATABASE_URL
 alembic upgrade head
@@ -309,7 +319,27 @@ digest. Resetting a password revokes every existing session.
 
 ## Model status and error contract
 
-`GET /api/models/status` tells the frontend whether inference is possible:
+`GET /api/models/status` tells the frontend whether inference is possible.
+With both checkpoints present it reports:
+
+```json
+{
+  "status": "ready",
+  "code": "MODEL_READY",
+  "available": true,
+  "availability": "available",
+  "message": "Plant analysis models are ready.",
+  "detail": "Plant analysis models are ready.",
+  "models": { "stress": true, "growth": true },
+  "device": "cpu",
+  "checkpoints": {
+    "stress": "/app/models/stress/stress_model.pth",
+    "growth": "/app/models/growth/growth_model.pth"
+  }
+}
+```
+
+If a checkpoint is missing it reports the problem instead:
 
 ```json
 {
@@ -318,13 +348,9 @@ digest. Resetting a password revokes every existing session.
   "available": false,
   "availability": "unavailable",
   "message": "Plant analysis models are not configured.",
-  "detail": "backend/inference.py has not been transferred into this repository yet.",
+  "detail": "Missing checkpoint file(s): /app/models/growth/growth_model.pth, …",
   "models": { "stress": false, "growth": false },
-  "device": "unavailable",
-  "checkpoints": {
-    "stress": "…/backend/models/stress/stress_model.pth",
-    "growth": "…/backend/models/growth/growth_model.pth"
-  }
+  "device": "unavailable"
 }
 ```
 
@@ -403,6 +429,68 @@ that the body stays byte-compatible with the research contract:
 - `age_days` is an experimental estimate. The current growth-model validation
   reports an **Age MAE of approximately 15.6 days**, so the UI always marks
   it as experimental.
+
+---
+
+## The models
+
+The application is built **around** the existing research models. Neither
+model was retrained, recreated or modified.
+
+### What is in the repository
+
+| File | Origin | Size |
+|---|---|---|
+| `backend/inference.py` | Transferred from the research project, **unmodified** | 9 KB |
+| `backend/models/growth/growth_model.pth` | Transferred checkpoint | 42.7 MB |
+| `backend/models/stress/stress_model.pth` | Transferred checkpoint | 42.7 MB |
+| `backend/models/growth/cv_metrics.json` | LeaveOnePlantOut cross-validation | 3 KB |
+| `backend/models/growth/cv_predictions.csv` | Per-image CV predictions | 10 KB |
+| `backend/models/growth/cv_plant_day_predictions.csv` | Per-plant/day CV predictions | 1 KB |
+| `backend/models/stress/metrics.json` | Validation split and accuracy | 145 B |
+| `backend/models/stress/training_history.csv` | Per-epoch training history | 851 B |
+
+Both checkpoints are tracked in **plain Git** — Git LFS is not used. A clone
+contains everything needed to run inference.
+
+### How they are wired in
+
+`backend/inference.py` exposes exactly two entry points:
+
+```python
+load_models(growth_checkpoint=..., stress_checkpoint=..., device=None) -> PlantModels
+predict_image(image, models_bundle) -> dict
+```
+
+Its own default checkpoint paths still point at the research layout
+(`<repo>/artifacts/...`). **The file was not edited.** Instead,
+`backend/services/model_service.py` supplies this repository's paths as
+keyword arguments, so the defaults are never used:
+
+```python
+load_models(
+    growth_checkpoint="<repo>/backend/models/growth/growth_model.pth",
+    stress_checkpoint="<repo>/backend/models/stress/stress_model.pth",
+)
+```
+
+The paths come from `MODEL_GROWTH_CHECKPOINT` and `MODEL_STRESS_CHECKPOINT`
+and are resolved against the backend package root, never against the process
+working directory.
+
+### Lifecycle
+
+| Stage | Behaviour |
+|---|---|
+| Startup | `load_models()` is called **once** inside the FastAPI lifespan. |
+| Request | `predict_image(image_bytes, models_bundle)` runs on a bounded worker thread. |
+| Concurrency | At most `INFERENCE_MAX_CONCURRENCY` jobs run at once (default `1`); a further request is refused with `MODEL_BUSY` rather than exhausting memory. |
+| Failure to load | The service reports `failed` / `MODEL_LOAD_FAILED`; unrelated endpoints keep working. |
+| Missing checkpoint | The service reports `not_configured` / `MODEL_NOT_CONFIGURED` and the prediction endpoint answers `503`. |
+
+Verified on this machine: one restart produces exactly one
+`Loading models (growth=…, stress=…, device=auto)` log line, and twenty
+consecutive predictions add **zero** further loads.
 
 ---
 
@@ -534,8 +622,16 @@ The models behind Planet Health are **experimental research models**.
 
 - They have been verified to **execute correctly** on CPU, but they have not
   been scientifically validated for field deployment.
-- The growth model's age prediction carries an **MAE of roughly 15.6 days**.
-  It must not be presented as a reliable measurement.
+- The growth model's age prediction carries an **MAE of roughly 15.6 days**
+  (the LeaveOnePlantOut cross-validation in
+  `backend/models/growth/cv_metrics.json` reports an overall image-level Age
+  MAE of **15.63 days** and an RMSE of 20.60). It must not be presented as a
+  reliable measurement. The same cross-validation reports a leaf-count MAE of
+  **1.00 leaf** (RMSE 1.31).
+- The stress classifier reached a best validation accuracy of **98.1 %** on
+  its 2 142-image validation split (`backend/models/stress/metrics.json`).
+  That is a closed-set classification accuracy, not a field measurement, and
+  the model has no notion of severity.
 - The stress score is the model's probability for the *Stressed* class. It is
   a confidence value, **not** a validated severity measurement.
 - Every results screen carries the disclaimer: *"These results are
@@ -544,6 +640,14 @@ The models behind Planet Health are **experimental research models**.
   assessment."*
 - The application never fabricates a prediction. When the models are
   unavailable it says so and returns `503`.
+
+### Observed behaviour
+
+A GroMo25 radish photograph (`radish/p1/d25/L1`, ground truth: 10 leaves at
+day 25) is predicted as **10 leaves** and **16.3 days** — the leaf count is
+exact and the age is within the documented error band. The same image is
+classified as *Stressed* with a 0.999 stressed probability; that is the
+model's genuine output, not a tuned or filtered result.
 
 ---
 
@@ -568,7 +672,8 @@ Planet-Health/
 │   ├── db/                     # ORM models
 │   ├── schemas/                # Pydantic schemas
 │   ├── services/               # business logic + model_service
-│   ├── models/                 # growth/ and stress/ checkpoint directories
+│   ├── models/                 # the trained checkpoints + research artefacts
+│   ├── inference.py            # transferred from the research project
 │   ├── alembic/                # migrations
 │   └── tests/                  # pytest suite
 └── frontend/
@@ -601,9 +706,12 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 The backend suite covers registration and validation, Argon2id hashing,
 login and logout, HTTP-only cookie flags, CSRF enforcement, protected routes,
 cross-account isolation of analyses, dashboard statistics derived from real
-records, image validation (wrong type, mislabelled payload), the model
-status endpoint, the `503` behaviour when the models are absent, and the
-complete password reset flow including single-use tokens.
+records, image validation (wrong type, unsupported format, a ".png" file
+that contains JPEG data), the model status endpoint, the `503` behaviour
+when the models are absent, the complete password reset flow including
+single-use tokens, and the Phase 2 wiring: `load_models()` receives this
+repository's checkpoint paths and `predict_image(bytes, bundle)` is called
+exactly as the research contract specifies.
 
 ---
 
