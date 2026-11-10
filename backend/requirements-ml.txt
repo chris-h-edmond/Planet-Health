@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# Planet Health — backend runtime dependencies including the ML runtime
+# ---------------------------------------------------------------------------
+# Install with the PyTorch CPU index so that the (very large) CUDA wheels are
+# not pulled in:
+#
+#   pip install -r requirements-ml.txt \
+#       --extra-index-url https://download.pytorch.org/whl/cpu
+#
+# or, for a pure CPU environment (recommended for local development):
+#
+#   pip install -r requirements.txt
+#   pip install torch==2.9.1 torchvision==0.24.1 \
+#       --index-url https://download.pytorch.org/whl/cpu
+#
+# Keep the torch / torchvision pair in sync — torchvision 0.24.x targets
+# torch 2.9.x.
+
+-r requirements.txt
+
+torch==2.9.1
+torchvision==0.24.1

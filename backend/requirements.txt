@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# Planet Health — backend runtime dependencies (core API)
+# ---------------------------------------------------------------------------
+# The ML runtime (torch / torchvision) is intentionally NOT included here so
+# that the application can be started, tested and deployed without the model
+# checkpoints.  Install `requirements-ml.txt` as well when the inference
+# module has been transferred into `backend/inference.py`.
+
+fastapi==0.162.3
+uvicorn[standard]==0.54.0
+
+pydantic==2.14.3
+pydantic-settings==2.16.2
+email-validator==2.3.0
+python-multipart==0.0.33
+
+SQLAlchemy==2.1.8
+alembic==1.20.1
+psycopg[binary]==3.3.8
+
+argon2-cffi==25.1.0
+Pillow==13.0.0
