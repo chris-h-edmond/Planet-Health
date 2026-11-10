@@ -13,7 +13,10 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-extend-exclude = ["alembic/versions"]
+# `alembic/versions` contains generated migrations.
+# `inference.py` is transferred research code and must stay byte-for-byte
+# unmodified, so it is not linted or reformatted.
+extend-exclude = ["alembic/versions", "inference.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
