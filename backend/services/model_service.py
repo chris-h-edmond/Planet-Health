@@ -29,11 +29,9 @@ import importlib.util
 import inspect
 import logging
 import threading
-import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from enum import Enum
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -358,7 +356,6 @@ class ModelService:
         if self._status is not ModelStatus.READY:
             return "unavailable"
         try:
-            import torch
 
             device = getattr(self._bundle, "device", None)
             if device is not None:

@@ -9,15 +9,14 @@ be echoed in the `X-CSRF-Token` header for state-changing requests.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 from core.config import Settings
 from core.errors import AuthenticationError, ConflictError
 from core.security import generate_token, hash_password, hash_token, verify_password
 from db.models import User, UserSession
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 EMAIL_MAX_LENGTH = 320
 
@@ -109,7 +108,7 @@ def create_session(
     ip_address: str | None = None,
 ) -> tuple[UserSession, str, str, datetime]:
     """Create a session and return it with the raw session and CSRF tokens."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + session_lifetime(settings, remember)
 
     session_token = generate_token(32)
@@ -146,8 +145,8 @@ def get_session_by_token(db: Session, token: str) -> UserSession | None:
 
     expires_at = record.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc):
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= datetime.now(UTC):
         db.delete(record)
         db.commit()
         return None
@@ -157,7 +156,7 @@ def get_session_by_token(db: Session, token: str) -> UserSession | None:
 
 def refresh_session(db: Session, record: UserSession, settings: Settings) -> datetime:
     """Extend the sliding expiry of a session and return the new expiry."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     lifetime = session_lifetime(settings, record.remember)
     record.expires_at = now + lifetime
     record.last_seen_at = now
@@ -170,8 +169,8 @@ def should_refresh(record: UserSession, settings: Settings) -> bool:
     """Return True when the sliding refresh window has elapsed."""
     last_seen = record.last_seen_at
     if last_seen.tzinfo is None:
-        last_seen = last_seen.replace(tzinfo=timezone.utc)
-    elapsed = (datetime.now(timezone.utc) - last_seen).total_seconds()
+        last_seen = last_seen.replace(tzinfo=UTC)
+    elapsed = (datetime.now(UTC) - last_seen).total_seconds()
     return elapsed >= settings.session_refresh_interval_seconds
 
 
@@ -189,7 +188,7 @@ def revoke_all_sessions(db: Session, user_id: int) -> None:
 
 def purge_expired_sessions(db: Session) -> int:
     """Delete expired session rows.  Returns the number of removed rows."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = select(UserSession).where(UserSession.expires_at <= now)
     removed = 0
     for record in db.execute(stmt).scalars().all():

@@ -8,7 +8,7 @@ binary is ever written to the database.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,7 +19,7 @@ from db.base import Base
 
 def utcnow() -> datetime:
     """Timezone-aware current UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class User(Base):
@@ -41,10 +41,10 @@ class User(Base):
         nullable=False,
     )
 
-    sessions: Mapped[list["UserSession"]] = relationship(
+    sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="noload"
     )
-    analyses: Mapped[list["Analysis"]] = relationship(
+    analyses: Mapped[list[Analysis]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="noload"
     )
 

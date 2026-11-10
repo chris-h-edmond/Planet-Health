@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import hmac
 from dataclasses import dataclass
-from datetime import datetime, timezone
-
-from fastapi import Depends, Request, Response
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 from core.config import Settings, get_settings
 from core.database import get_db
-from core.errors import AuthenticationError, AppError
+from core.errors import AppError, AuthenticationError
 from core.security import hash_token
 from db.models import User, UserSession
+from fastapi import Depends, Request, Response
 from services import auth_service
+from sqlalchemy.orm import Session
 
 
 @dataclass
@@ -141,7 +140,7 @@ def set_session_cookies(
     """Write the session and CSRF cookies."""
     max_age: int | None = None
     if remember:
-        remaining = expires_at - datetime.now(timezone.utc)
+        remaining = expires_at - datetime.now(UTC)
         max_age = max(0, int(remaining.total_seconds()))
 
     response.set_cookie(

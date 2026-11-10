@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 from schemas.analysis import DashboardStats
+from sqlalchemy.orm import Session
+
 from services import analysis_service
 
 RECENT_WINDOW_DAYS = 7
@@ -24,7 +24,7 @@ def get_stats(db: Session, *, user_id: int) -> DashboardStats:
     healthy = counts.get("Healthy", 0)
     stressed = counts.get("Stressed", 0)
 
-    since = datetime.now(timezone.utc) - timedelta(days=RECENT_WINDOW_DAYS)
+    since = datetime.now(UTC) - timedelta(days=RECENT_WINDOW_DAYS)
     recent = analysis_service.count_since(db, user_id=user_id, since=since)
 
     average_score = analysis_service.average_stress_score(db, user_id=user_id)

@@ -4,7 +4,32 @@ from __future__ import annotations
 
 import logging
 
+from core.config import Settings
+from core.database import get_db
+from core.errors import (
+    AppError,
+    AuthenticationError,
+    ServiceUnavailableError,
+)
+from core.mailer import (
+    is_available,
+    send_password_reset_email,
+)
+from core.rate_limit import rate_limiter
+from core.security import generate_token, hash_token
+from db.models import User
 from fastapi import APIRouter, Depends, Request, Response, status
+from schemas.auth import (
+    AuthResponse,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    UpdateProfileRequest,
+    UserResponse,
+)
+from services import auth_service, reset_service
 from sqlalchemy.orm import Session
 
 from api.deps import (
@@ -18,32 +43,6 @@ from api.deps import (
     get_session_context,
     set_session_cookies,
 )
-from core.config import Settings
-from core.database import get_db
-from core.errors import (
-    AppError,
-    AuthenticationError,
-    ServiceUnavailableError,
-)
-from core.mailer import (
-    EmailDeliveryNotConfigured,
-    is_available,
-    send_password_reset_email,
-)
-from core.rate_limit import rate_limiter
-from core.security import generate_token, hash_token
-from db.models import User
-from schemas.auth import (
-    AuthResponse,
-    ChangePasswordRequest,
-    ForgotPasswordRequest,
-    LoginRequest,
-    RegisterRequest,
-    ResetPasswordRequest,
-    UpdateProfileRequest,
-    UserResponse,
-)
-from services import auth_service, reset_service
 
 logger = logging.getLogger("planethealth.auth")
 

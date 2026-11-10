@@ -1,0 +1,12 @@
+# ---------------------------------------------------------------------------
+# Planet Health — backend development dependencies
+# ---------------------------------------------------------------------------
+#   pip install -r requirements-dev.txt
+#
+# The production image installs `requirements.txt` only.
+
+-r requirements.txt
+
+pytest==9.2.0
+httpx==0.28.1
+ruff==0.17.4

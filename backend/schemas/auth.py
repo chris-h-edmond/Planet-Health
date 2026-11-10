@@ -54,7 +54,7 @@ class RegisterRequest(BaseModel):
         return _validate_password_strength(value)
 
     @model_validator(mode="after")
-    def _passwords_match(self) -> "RegisterRequest":
+    def _passwords_match(self) -> RegisterRequest:
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match.")
         return self
@@ -94,7 +94,7 @@ class ChangePasswordRequest(BaseModel):
         return _validate_password_strength(value)
 
     @model_validator(mode="after")
-    def _passwords_match(self) -> "ChangePasswordRequest":
+    def _passwords_match(self) -> ChangePasswordRequest:
         if self.new_password != self.confirm_new_password:
             raise ValueError("Passwords do not match.")
         if self.new_password == self.current_password:
@@ -122,7 +122,7 @@ class ResetPasswordRequest(BaseModel):
         return _validate_password_strength(value)
 
     @model_validator(mode="after")
-    def _passwords_match(self) -> "ResetPasswordRequest":
+    def _passwords_match(self) -> ResetPasswordRequest:
         if self.new_password != self.confirm_new_password:
             raise ValueError("Passwords do not match.")
         return self

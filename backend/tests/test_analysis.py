@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-
 from tests.conftest import csrf_headers, make_image_bytes
 
 
@@ -96,7 +95,7 @@ def test_history_is_scoped_to_the_owning_user(
 ) -> None:
     """A second account must not see the analyses of the first one."""
     from core.database import SessionLocal
-    from db.models import Analysis, User
+    from db.models import Analysis
     from services import auth_service
 
     with SessionLocal() as db:

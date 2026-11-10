@@ -212,6 +212,7 @@ python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt      # core API only
+pip install -r requirements-dev.txt  # + pytest, httpx, ruff
 # Optional: the ML runtime (needed in Phase 2)
 pip install torch==2.9.1 torchvision==0.24.1 \
     --index-url https://download.pytorch.org/whl/cpu
@@ -587,10 +588,13 @@ Planet-Health/
 ## Testing
 
 ```bash
-# Backend — 36 tests, no models required
+# Backend — 38 tests, no models required
 cd backend && python -m pytest -q
 
-# Frontend — type safety and production build
+# Backend — lint
+cd backend && ruff check .
+
+# Frontend — type safety, lint and production build
 cd frontend && npm run typecheck && npm run lint && npm run build
 ```
 

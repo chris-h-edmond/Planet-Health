@@ -7,13 +7,12 @@ is never persisted.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
+from db.models import Analysis
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
-from db.models import Analysis
 
 
 def create_analysis(db: Session, *, user_id: int, prediction: dict[str, Any]) -> Analysis:

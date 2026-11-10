@@ -58,7 +58,7 @@ class AnalysisSummary(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_record(cls, record) -> "AnalysisSummary":
+    def from_record(cls, record) -> AnalysisSummary:
         return cls(
             id=record.id,
             stress_label=record.stress_label,

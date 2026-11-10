@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from datetime import UTC, datetime
 
 from api import analysis as analysis_api
 from api import auth as auth_api
@@ -16,6 +13,8 @@ from api import models as models_api
 from core.config import get_settings
 from core.database import dispose_engine, engine
 from core.errors import register_exception_handlers
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from services.model_service import model_service
 
 logger = logging.getLogger("planethealth")
@@ -106,7 +105,7 @@ def create_app() -> FastAPI:
             "environment": settings.app_env,
             "database": database_state,
             "models": model_service.status.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     return app

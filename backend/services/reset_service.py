@@ -7,13 +7,13 @@ Tokens are single use and expire after a short window.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 from core.security import generate_token, hash_token
 from db.models import PasswordResetToken, User
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
 from services.auth_service import get_user_by_id
 
 #: How long a reset link stays valid.
@@ -26,7 +26,7 @@ def create_reset_token(
     user: User,
 ) -> tuple[str, PasswordResetToken]:
     """Create a reset token for a user and return the raw token and record."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Any previously issued token for this account is invalidated.
     db.execute(
@@ -70,11 +70,11 @@ def consume_reset_token(db: Session, *, raw_token: str) -> User | None:
 
     expires_at = record.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc):
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= datetime.now(UTC):
         return None
 
-    record.used_at = datetime.now(timezone.utc)
+    record.used_at = datetime.now(UTC)
     db.commit()
 
     return get_user_by_id(db, record.user_id)
@@ -82,7 +82,7 @@ def consume_reset_token(db: Session, *, raw_token: str) -> User | None:
 
 def purge_expired_tokens(db: Session) -> int:
     """Delete tokens that are used or expired. Returns the number removed."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = select(PasswordResetToken).where(
         (PasswordResetToken.expires_at <= now) | (PasswordResetToken.used_at.is_not(None))
     )

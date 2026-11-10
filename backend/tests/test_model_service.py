@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from core.errors import AppError, ServiceUnavailableError
 from services.model_service import ModelService, ModelStatus
 

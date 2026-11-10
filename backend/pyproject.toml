@@ -17,7 +17,10 @@ extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501", "B008"]
+# UP042: `class ModelStatus(str, Enum)` is kept deliberately — the code always
+# reads the explicit `.value`, and the mixin keeps the enum JSON friendly
+# without depending on Python 3.11's `StrEnum`.
+ignore = ["E501", "B008", "UP042"]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["E402"]
