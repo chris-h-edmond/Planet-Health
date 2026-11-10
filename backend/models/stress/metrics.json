@@ -1,0 +1,7 @@
+{
+  "image_count": 2142,
+  "train_count": 1713,
+  "validation_count": 429,
+  "best_validation_accuracy": 0.9813519813519813,
+  "device": "cuda"
+}

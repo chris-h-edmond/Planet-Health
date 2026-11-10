@@ -7,21 +7,17 @@
 # NOTE: the first line above is the repository default and is preserved
 # verbatim. Everything below refines it.
 
-# --- Model checkpoints (Git LFS) -------------------------------------------
-# ResNet-18 checkpoints are ~45 MB each. Track them with Git LFS so that
-# `git clone` stays fast and the binary payload is never corrupted by
-# text normalization.
+# --- Model checkpoints (plain Git, no LFS) --------------------------------
+# The trained ResNet-18 checkpoints are ~43 MB each and are tracked in plain
+# Git — Git LFS is not used for this repository.
 #
-# Usage (see INSTRUCTIONS_TO_CHRIS.md):
-#   git lfs install
-#   git lfs track "backend/models/**/*.pth"
-#
-# If Git LFS is unavailable, remove the rules below and deliver the
-# checkpoints through an external artifact store instead.
-*.pth filter=lfs diff=lfs merge=lfs -text
-*.pt filter=lfs diff=lfs merge=lfs -text
-*.onnx filter=lfs diff=lfs merge=lfs -text
-*.ckpt filter=lfs diff=lfs merge=lfs -text
+# They must never be text-normalised, so they are explicitly marked binary.
+# `* text=auto` above already detects them as binary, this rule makes the
+# intent explicit and protects against any future change to that default.
+*.pth binary
+*.pt binary
+*.onnx binary
+*.ckpt binary
 
 # --- Other binary assets ----------------------------------------------------
 *.png binary

@@ -35,16 +35,14 @@ build/
 next-env.d.ts
 
 # --- Model artifacts -------------------------------------------------------
-# Model checkpoints are large binaries and are intentionally excluded from
-# plain Git. Use Git LFS (see .gitattributes) or an external artifact store.
-backend/models/**/*.pth
-backend/models/**/*.pt
-backend/models/**/*.onnx
-backend/models/**/*.ckpt
-*.pth
-*.pt
-*.onnx
-*.ckpt
+# The trained checkpoints are intentionally TRACKED in plain Git (no Git LFS).
+#   backend/models/growth/growth_model.pth
+#   backend/models/stress/stress_model.pth
+# They are large binaries, so .gitattributes marks them as binary to make sure
+# Git never applies text normalisation to them. Only ad-hoc scratch
+# checkpoints outside the repository are ignored.
+*.pth.tmp
+*.part
 
 # --- Runtime data ----------------------------------------------------------
 postgres_data/

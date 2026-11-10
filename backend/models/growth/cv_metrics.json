@@ -1,0 +1,133 @@
+{
+  "protocol": "LeaveOnePlantOut",
+  "folds": [
+    {
+      "fold": 1,
+      "held_out_plant": "p1",
+      "train_images": 96,
+      "test_images": 32,
+      "plant_day_observations": 8,
+      "image_level": {
+        "leaf_count": {
+          "mae": 1.2687993049621582,
+          "rmse": 1.688619613647461
+        },
+        "Age": {
+          "mae": 16.137744903564453,
+          "rmse": 21.561595916748047
+        }
+      },
+      "plant_day_level": {
+        "leaf_count": {
+          "mae": 1.1239105463027954,
+          "rmse": 1.5714914798736572
+        },
+        "Age": {
+          "mae": 16.08746910095215,
+          "rmse": 21.554540634155273
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "held_out_plant": "p2",
+      "train_images": 96,
+      "test_images": 32,
+      "plant_day_observations": 8,
+      "image_level": {
+        "leaf_count": {
+          "mae": 0.8180114030838013,
+          "rmse": 0.9613661766052246
+        },
+        "Age": {
+          "mae": 15.173027038574219,
+          "rmse": 20.683088302612305
+        }
+      },
+      "plant_day_level": {
+        "leaf_count": {
+          "mae": 0.8162317276000977,
+          "rmse": 0.8768711090087891
+        },
+        "Age": {
+          "mae": 15.058855056762695,
+          "rmse": 20.6712703704834
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "held_out_plant": "p3",
+      "train_images": 96,
+      "test_images": 32,
+      "plant_day_observations": 8,
+      "image_level": {
+        "leaf_count": {
+          "mae": 0.8079661130905151,
+          "rmse": 0.9806085228919983
+        },
+        "Age": {
+          "mae": 16.64183807373047,
+          "rmse": 20.559940338134766
+        }
+      },
+      "plant_day_level": {
+        "leaf_count": {
+          "mae": 0.7628350257873535,
+          "rmse": 0.931837260723114
+        },
+        "Age": {
+          "mae": 16.64183807373047,
+          "rmse": 20.55068588256836
+        }
+      }
+    },
+    {
+      "fold": 4,
+      "held_out_plant": "p4",
+      "train_images": 96,
+      "test_images": 32,
+      "plant_day_observations": 8,
+      "image_level": {
+        "leaf_count": {
+          "mae": 1.0886120796203613,
+          "rmse": 1.4620301723480225
+        },
+        "Age": {
+          "mae": 14.585874557495117,
+          "rmse": 19.557090759277344
+        }
+      },
+      "plant_day_level": {
+        "leaf_count": {
+          "mae": 1.04004967212677,
+          "rmse": 1.4042823314666748
+        },
+        "Age": {
+          "mae": 14.585872650146484,
+          "rmse": 19.53999900817871
+        }
+      }
+    }
+  ],
+  "overall_image_level": {
+    "leaf_count": {
+      "mae": 0.995847225189209,
+      "rmse": 1.3109906911849976
+    },
+    "Age": {
+      "mae": 15.634620666503906,
+      "rmse": 20.602691650390625
+    }
+  },
+  "overall_plant_day_level": {
+    "leaf_count": {
+      "mae": 0.9357567429542542,
+      "rmse": 1.2327629327774048
+    },
+    "Age": {
+      "mae": 15.593509674072266,
+      "rmse": 20.591514587402344
+    }
+  }
+}
