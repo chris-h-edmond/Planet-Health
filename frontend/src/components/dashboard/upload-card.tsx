@@ -85,6 +85,16 @@ export function UploadCard({
   }, []);
 
   function applyFile(next: File | null) {
+    // Validate before discarding the current selection so that a rejected
+    // file never destroys a perfectly good one.
+    if (next) {
+      const validationError = validateFile(next);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
+
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
@@ -95,12 +105,6 @@ export function UploadCard({
     setInlinePrediction(null);
 
     if (!next) return;
-
-    const validationError = validateFile(next);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
 
     const url = URL.createObjectURL(next);
     previewUrlRef.current = url;
