@@ -9,11 +9,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from core.security import generate_token, hash_token
-from db.models import PasswordResetToken, User
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from core.security import generate_token, hash_token
+from db.models import PasswordResetToken, User
 from services.auth_service import get_user_by_id
 
 #: How long a reset link stays valid.

@@ -6,6 +6,9 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from api import analysis as analysis_api
 from api import auth as auth_api
 from api import dashboard as dashboard_api
@@ -13,8 +16,6 @@ from api import models as models_api
 from core.config import get_settings
 from core.database import dispose_engine, engine
 from core.errors import register_exception_handlers
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from services.model_service import model_service
 
 logger = logging.getLogger("planethealth")

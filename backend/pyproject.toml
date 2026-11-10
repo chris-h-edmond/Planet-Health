@@ -22,5 +22,13 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # without depending on Python 3.11's `StrEnum`.
 ignore = ["E501", "B008", "UP042"]
 
+[tool.ruff.lint.isort]
+# Pin the first-party packages so the import order is identical whether Ruff
+# is run from `backend/` or from the repository root.
+known-first-party = ["api", "core", "db", "schemas", "services", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
-"alembic/env.py" = ["E402"]
+# `alembic/env.py` lives in a directory that shares its name with the
+# third-party Alembic package, so the import grouping cannot be resolved
+# automatically. The module also needs imports after a path manipulation.
+"**/alembic/env.py" = ["E402", "I001"]

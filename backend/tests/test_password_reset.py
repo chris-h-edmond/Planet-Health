@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 
-from core.config import get_settings
 from fastapi.testclient import TestClient
+
+from core.config import get_settings
 from services import auth_service, reset_service
 
 

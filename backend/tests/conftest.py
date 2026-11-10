@@ -23,11 +23,12 @@ os.environ.setdefault("CORS_ALLOW_ORIGINS", "http://testserver")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://testserver")
 
 import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from PIL import Image  # noqa: E402
+
 from core.database import engine  # noqa: E402
 from db import models  # noqa: E402,F401  (registers the ORM mappings)
 from db.base import Base  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from PIL import Image  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)

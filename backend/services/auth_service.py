@@ -11,12 +11,13 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from core.config import Settings
 from core.errors import AuthenticationError, ConflictError
 from core.security import generate_token, hash_password, hash_token, verify_password
 from db.models import User, UserSession
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 EMAIL_MAX_LENGTH = 320
 

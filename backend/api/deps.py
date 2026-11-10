@@ -6,14 +6,15 @@ import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from fastapi import Depends, Request, Response
+from sqlalchemy.orm import Session
+
 from core.config import Settings, get_settings
 from core.database import get_db
 from core.errors import AppError, AuthenticationError
 from core.security import hash_token
 from db.models import User, UserSession
-from fastapi import Depends, Request, Response
 from services import auth_service
-from sqlalchemy.orm import Session
 
 
 @dataclass

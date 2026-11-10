@@ -17,9 +17,10 @@ import io
 import logging
 from dataclasses import dataclass
 
+from PIL import Image, UnidentifiedImageError
+
 from core.config import Settings
 from core.errors import ValidationError
-from PIL import Image, UnidentifiedImageError
 
 logger = logging.getLogger("planethealth.uploads")
 

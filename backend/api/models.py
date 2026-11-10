@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+
 from services.model_service import model_service
 
 router = APIRouter(prefix="/models", tags=["Models"])

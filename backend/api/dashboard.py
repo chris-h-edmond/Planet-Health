@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from core.database import get_db
-from db.models import User
 from fastapi import APIRouter, Depends
-from schemas.analysis import DashboardStats
-from services import dashboard_service
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
+from core.database import get_db
+from db.models import User
+from schemas.analysis import DashboardStats
+from services import dashboard_service
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from schemas.analysis import DashboardStats
 from sqlalchemy.orm import Session
 
+from schemas.analysis import DashboardStats
 from services import analysis_service
 
 RECENT_WINDOW_DAYS = 7
