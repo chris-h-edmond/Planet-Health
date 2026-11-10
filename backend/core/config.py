@@ -21,6 +21,20 @@ DEFAULT_MODELS_DIR = BACKEND_ROOT / "models"
 _INSECURE_DEFAULT_SECRET = "planet-health-insecure-development-secret-key"
 
 
+def _resolve_checkpoint_path(value: str | Path) -> Path:
+    """Resolve a checkpoint path.
+
+    A relative path is always interpreted relative to the backend package
+    root, never relative to the current working directory.  This keeps the
+    configuration identical for the Docker image, the local development
+    server and the test-suite.
+    """
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return (BACKEND_ROOT / path).resolve()
+
+
 class Settings(BaseSettings):
     """Central settings object for the Planet Health backend."""
 
@@ -198,11 +212,11 @@ class Settings(BaseSettings):
 
     @property
     def growth_checkpoint(self) -> Path:
-        return Path(self.model_growth_checkpoint).expanduser()
+        return _resolve_checkpoint_path(self.model_growth_checkpoint)
 
     @property
     def stress_checkpoint(self) -> Path:
-        return Path(self.model_stress_checkpoint).expanduser()
+        return _resolve_checkpoint_path(self.model_stress_checkpoint)
 
 
 @lru_cache(maxsize=1)

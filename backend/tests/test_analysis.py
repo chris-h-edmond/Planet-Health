@@ -55,14 +55,33 @@ def test_prediction_rejects_a_non_image_upload(auth_client: TestClient) -> None:
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_prediction_rejects_a_mislabelled_image(auth_client: TestClient) -> None:
+def test_prediction_rejects_an_unsupported_image_format(auth_client: TestClient) -> None:
     headers = csrf_headers(auth_client)
     response = auth_client.post(
         "/api/analysis/predict",
-        files={"file": ("leaf.jpg", make_image_bytes(fmt="PNG"), "image/jpeg")},
+        files={"file": ("leaf.bmp", make_image_bytes(fmt="BMP"), "image/bmp")},
         headers=headers,
     )
     assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_prediction_accepts_an_image_whose_declared_type_differs_from_its_content(
+    auth_client: TestClient,
+) -> None:
+    """A ".png" file that actually contains JPEG data is a real-world case.
+
+    The decoded content is the authority, so the upload must pass validation
+    and reach the model check (which reports 503 while the models are absent).
+    """
+    headers = csrf_headers(auth_client)
+    response = auth_client.post(
+        "/api/analysis/predict",
+        files={"file": ("leaf.png", make_image_bytes(fmt="JPEG"), "image/png")},
+        headers=headers,
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "MODEL_NOT_CONFIGURED"
 
 
 def test_prediction_requires_authentication(client: TestClient) -> None:

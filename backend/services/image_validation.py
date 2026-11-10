@@ -102,9 +102,16 @@ def validate_upload(
 
     detected_type = ACCEPTED_FORMATS[image_format]
     if normalised_type and normalised_type != detected_type:
-        raise ValidationError(
-            "The file content does not match the declared file type.",
-            {"declared": normalised_type, "detected": detected_type},
+        # The declared type comes from the file extension and the detected
+        # type comes from the actual bytes.  Real photographs are routinely
+        # stored with a ".png" name while containing JPEG data, so a mismatch
+        # is recorded but not rejected: the *decoded* content is what the
+        # models consume and it has already been verified to be a JPEG or
+        # PNG image above.
+        logger.info(
+            "Accepted upload with a mismatched declared type (declared=%s, detected=%s).",
+            normalised_type,
+            detected_type,
         )
 
     if width * height > settings.max_image_pixels:
