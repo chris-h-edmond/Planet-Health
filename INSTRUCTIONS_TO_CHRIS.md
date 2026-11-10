@@ -179,11 +179,12 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pip install torch==2.9.1 torchvision==0.24.1 \
-    --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-ml.txt
 ```
 
-Use the CUDA index instead if you have a GPU:
+`requirements-ml.txt` already points at the PyTorch **CPU** wheel index, so
+the multi-gigabyte CUDA builds are not pulled in. For a GPU, swap the index
+for `https://download.pytorch.org/whl/cu121`:
 
 ```bash
 pip install torch==2.9.1 torchvision==0.24.1 \
