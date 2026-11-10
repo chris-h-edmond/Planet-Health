@@ -1,0 +1,132 @@
+﻿# ---------------------------------------------------------------------------
+# Planet Health â€” local development stack
+#
+#   docker compose up --build
+#
+# Services
+#   db        PostgreSQL 16 (persistent volume)
+#   backend   FastAPI      (runs Alembic migrations on start)
+#   frontend  Next.js      (proxies /api to the backend)
+#
+# The stack starts and works even when the model checkpoints are absent â€”
+# the prediction endpoint then answers with HTTP 503.
+# ---------------------------------------------------------------------------
+
+name: planet-health
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: planet-health-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-planethealth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-planethealth}
+      POSTGRES_DB: ${POSTGRES_DB:-planethealth}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-planethealth} -d ${POSTGRES_DB:-planethealth}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        # Set to false for a much smaller / faster image while the model
+        # checkpoints are not yet installed. See INSTRUCTIONS_TO_CHRIS.md.
+        INSTALL_ML_DEPS: ${INSTALL_ML_DEPS:-true}
+    container_name: planet-health-backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME:-Planet Health API}
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-false}
+      API_PREFIX: ${API_PREFIX:-/api}
+      DATABASE_URL: >-
+        postgresql+psycopg://${POSTGRES_USER:-planethealth}:${POSTGRES_PASSWORD:-planethealth}@db:5432/${POSTGRES_DB:-planethealth}
+      SECRET_KEY: ${SECRET_KEY:-planet-health-development-secret-change-me}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-ph_session}
+      CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-ph_csrf}
+      SESSION_HINT_COOKIE_NAME: ${SESSION_HINT_COOKIE_NAME:-ph_session_hint}
+      SESSION_LIFETIME_SECONDS: ${SESSION_LIFETIME_SECONDS:-43200}
+      SESSION_REMEMBER_LIFETIME_SECONDS: ${SESSION_REMEMBER_LIFETIME_SECONDS:-2592000}
+      SESSION_REFRESH_INTERVAL_SECONDS: ${SESSION_REFRESH_INTERVAL_SECONDS:-900}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+      ALLOWED_IMAGE_MIME_TYPES: ${ALLOWED_IMAGE_MIME_TYPES:-image/jpeg,image/png}
+      MODEL_GROWTH_CHECKPOINT: ${MODEL_GROWTH_CHECKPOINT:-models/growth/growth_model.pth}
+      MODEL_STRESS_CHECKPOINT: ${MODEL_STRESS_CHECKPOINT:-models/stress/stress_model.pth}
+      MODEL_LOAD_ON_STARTUP: ${MODEL_LOAD_ON_STARTUP:-true}
+      MODEL_DEVICE: ${MODEL_DEVICE:-auto}
+      INFERENCE_MAX_CONCURRENCY: ${INFERENCE_MAX_CONCURRENCY:-1}
+      INFERENCE_TIMEOUT_SECONDS: ${INFERENCE_TIMEOUT_SECONDS:-120}
+      EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@planethealth.local}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+    volumes:
+      # The model checkpoint directory is bind-mounted so that the .pth files
+      # can be added in Phase 2 without rebuilding the image.
+      - ./backend/models:/app/models:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)",
+        ]
+      interval: 15s
+      timeout: 6s
+      retries: 6
+      start_period: 30s
+    command: >-
+      sh -c "alembic upgrade head &&
+      uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        NEXT_PUBLIC_MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+        NEXT_PUBLIC_CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-ph_csrf}
+        NEXT_PUBLIC_SESSION_HINT_COOKIE_NAME: ${SESSION_HINT_COOKIE_NAME:-ph_session_hint}
+    container_name: planet-health-frontend
+    restart: unless-stopped
+    environment:
+      # Server-side URL of the FastAPI backend, used by the /api proxy.
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://backend:8000}
+      NODE_ENV: production
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+
