@@ -1,2 +1,49 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# ---------------------------------------------------------------------------
+# Planet Health — binary and model artifact handling
+# ---------------------------------------------------------------------------
+# NOTE: the first line above is the repository default and is preserved
+# verbatim. Everything below refines it.
+
+# --- Model checkpoints (Git LFS) -------------------------------------------
+# ResNet-18 checkpoints are ~45 MB each. Track them with Git LFS so that
+# `git clone` stays fast and the binary payload is never corrupted by
+# text normalization.
+#
+# Usage (see INSTRUCTIONS_TO_CHRIS.md):
+#   git lfs install
+#   git lfs track "backend/models/**/*.pth"
+#
+# If Git LFS is unavailable, remove the rules below and deliver the
+# checkpoints through an external artifact store instead.
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
+*.onnx filter=lfs diff=lfs merge=lfs -text
+*.ckpt filter=lfs diff=lfs merge=lfs -text
+
+# --- Other binary assets ----------------------------------------------------
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.whl binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary
+
+# --- Lockfiles keep LF -----------------------------------------------------
+package-lock.json text eol=lf
+pnpm-lock.yaml text eol=lf
+yarn.lock text eol=lf
+uv.lock text eol=lf
+
+# --- Explicitly keep model directory placeholders tracked ------------------
+backend/models/**/.gitkeep text eol=lf

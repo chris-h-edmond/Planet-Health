@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Planet Health — repository ignore rules
+# ---------------------------------------------------------------------------
+
+# --- Environment / secrets -------------------------------------------------
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_tmp/
+.coverage
+htmlcov/
+
+# --- Node / Next.js --------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Model artifacts -------------------------------------------------------
+# Model checkpoints are large binaries and are intentionally excluded from
+# plain Git. Use Git LFS (see .gitattributes) or an external artifact store.
+backend/models/**/*.pth
+backend/models/**/*.pt
+backend/models/**/*.onnx
+backend/models/**/*.ckpt
+*.pth
+*.pt
+*.onnx
+*.ckpt
+
+# --- Runtime data ----------------------------------------------------------
+postgres_data/
+.pgdata/
+var/
+tmp/
+
+# --- Editors / OS ----------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
