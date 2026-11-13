@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Github } from "lucide-react";
 
 import { PlanetHealthLogo } from "@/components/brand/planet-health-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -40,6 +40,24 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1.5">
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="View Planet Health GitHub repository"
+          >
+            <a
+              href="https://github.com/chris-h-edmond/Planet-Health"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Planet Health GitHub repository"
+              className="flex items-center justify-center"
+            >
+              <Github className="size-[18px]" />
+            </a>
+          </Button>
+
           <ThemeToggle />
 
           {status === "authenticated" ? (
