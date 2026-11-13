@@ -34,6 +34,11 @@ export const metadata: Metadata = {
     "agriculture",
   ],
   authors: [{ name: "Planet Health" }],
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
   openGraph: {
     title: "Planet Health — AI-Powered Plant Monitoring",
     description:
